@@ -1,0 +1,71 @@
+spring:
+  application:
+    name: mbm
+
+  # =====================
+  # MySQL (기본)
+  # =====================
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT:3306}/${MYSQL_DATABASE}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${MYSQL_USERNAME}
+    password: ${MYSQL_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # =====================
+  # H2 (로컬 테스트용 - MySQL 없을 때 위 datasource 주석 처리 후 사용)
+  # =====================
+  # datasource:
+  #   url: jdbc:h2:mem:heungbu;MODE=MySQL
+  #   driver-class-name: org.h2.Driver
+  #   username: sa
+  #   password:
+  # h2:
+  #   console:
+  #     enabled: true
+
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:none} # 개발: create / 배포 후: validate (Flyway 쓰면 none)
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  # =====================
+  # Flyway (선택 - 쓰려면 주석 해제 + build.gradle에 의존성 추가)
+  # =====================
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  # =====================
+  # Redis (선택 - 캐싱 필요할 때 주석 해제)
+  # =====================
+  # data:
+  #   redis:
+  #     host: localhost
+  #     port: 6379
+
+# =====================
+# AI 서버 URL (AI팀 서버 주소로 변경)
+# =====================
+ai:
+  server:
+    url: ${AI_SERVER_URL}   # FastAPI 기본 포트
+
+
+# =====================
+# Swagger UI
+# =====================
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+logging:
+  level:
+    import com.ux.mbm: DEBUG
+    org.hibernate.SQL: DEBUG
