@@ -1,7 +1,6 @@
 package com.ux.mbm.mission.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -11,8 +10,8 @@ import java.util.Map;
 /**
  * Unity → Backend 요청 바디
  *
- * beforeMessage=true  → AI 호출 없이 DB의 before_message 반환 (미션 시작 전 안내)
- * beforeMessage=false → 기존 AI 판정 플로우 (기본값)
+ * beforeMission=true  → AI 호출 없이 DB의 before_message 반환 (미션 시작 전 안내)
+ * beforeMission=false → 기존 AI 판정 플로우 (기본값)
  */
 @Getter
 @NoArgsConstructor
@@ -29,17 +28,17 @@ public class MissionResultRequest {
      * true  → AI 호출 없이 story_scenes.before_message 반환
      * false → 기존 AI 판정 플로우 (기본값)
      */
-    private boolean beforeMessage = false;
+    private boolean beforeMission = false;
 
-    /** beforeMessage=false 일 때 필수 */
+    /** beforeMission=false 일 때 필수 */
     private String missionType;
 
     private int captureDurationSec;
     private int sampleFps;
 
     /**
-     * beforeMessage=true 이면 빈 배열이어도 됨
-     * beforeMessage=false 이면 필수
+     * beforeMission=true 이면 빈 배열이어도 됨
+     * beforeMission=false 이면 필수
      */
     private List<PoseFrame> poseFrames;
 
