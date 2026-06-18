@@ -53,7 +53,7 @@ public class MissionResultResponse {
     /**
      * 동작 판정 이유 코드 (AI 서버 반환값을 그대로 전달)
      * 성공: MISSION_SUCCESS
-     * 실패: HANDS_TOO_FAR, HANDS_NOT_CENTERED, HAND_NOT_RAISED, ARMS_NOT_WIDE, MOVEMENT_TOO_SMALL, LOW_SCORE
+     * 실패: HANDS_TOO_FAR, HANDS_NOT_CENTERED, HAND_NOT_RAISED, MOVEMENT_TOO_SMALL, LOW_SCORE
      */
     private String reasonCode;
 
@@ -62,7 +62,7 @@ public class MissionResultResponse {
 
     /**
      * 판정 불가 또는 시스템 오류 코드
-     * USER_NOT_DETECTED, HAND_NOT_VISIBLE, INVALID_POSE_DATA,
+     * USER_NOT_DETECTED, HAND_NOT_VISIBLE, INVALID_POSE_DATA, UNKNOWN_MISSION_TYPE,
      * MISSION_MISMATCH, AI_SERVER_ERROR, INTERNAL_SERVER_ERROR
      */
     private String errorCode;

@@ -9,7 +9,7 @@ import lombok.RequiredArgsConstructor;
  * errorCode는 동작이 부족한 경우가 아니라,
  * 판정 자체가 어렵거나 시스템 문제가 있을 때 사용합니다.
  *
- * - AI 서버 반환: USER_NOT_DETECTED, HAND_NOT_VISIBLE, INVALID_POSE_DATA
+ * - AI 서버 반환: USER_NOT_DETECTED, HAND_NOT_VISIBLE, INVALID_POSE_DATA, UNKNOWN_MISSION_TYPE
  * - 백엔드 반환:  INVALID_POSE_DATA, MISSION_MISMATCH, UNKNOWN_MISSION_TYPE, AI_SERVER_ERROR, INTERNAL_SERVER_ERROR
  */
 @Getter
