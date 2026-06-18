@@ -46,7 +46,7 @@ public class MissionResultService {
         StoryScene scene = sceneOpt.get();
 
         // ── [2] beforeMessage=true → AI 호출 없이 before_message 즉시 반환 ──
-        if (request.isBeforeMessage()) {
+        if (request.isBeforeMission()) {
             String msg = scene.getBeforeMessage() != null
                     ? scene.getBeforeMessage()
                     : "미션을 시작해보세요!";
@@ -69,9 +69,9 @@ public class MissionResultService {
 
         // ── [3] missionType 검증 (AI 호출 전) ────────────────────────
         if (!scene.getMissionType().equals(request.getMissionType())) {
-            log.warn("[MISSION_MISMATCH] missionType 불일치 - sceneId={}, expected={}, actual={}",
+            log.warn("[UNKNOWN_MISSION_TYPE] missionType 불일치 - sceneId={}, expected={}, actual={}",
                     request.getSceneId(), scene.getMissionType(), request.getMissionType());
-            return buildErrorResponse(request.getSceneId(), ErrorCode.MISSION_MISMATCH);
+            return buildErrorResponse(request.getSceneId(), ErrorCode.UNKNOWN_MISSION_TYPE);
         }
 
         // ── [4] AI 서버 호출 ──────────────────────────────────────────

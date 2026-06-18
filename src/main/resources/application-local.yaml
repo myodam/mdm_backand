@@ -28,10 +28,11 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+    repair-on-migrate: true
 
 ai:
   server:
-    url: http://localhost:8000
+    url: https://mwm.bellrajin.com
 
 springdoc:
   swagger-ui:

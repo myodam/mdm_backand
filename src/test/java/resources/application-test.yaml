@@ -31,7 +31,7 @@ spring:
 # ── AI 서버 URL: 테스트에서는 Mock으로 대체하므로 더미값 ──────
 ai:
   server:
-    url: http://localhost:8000
+    url: http://localhost:
 
 logging:
   level:

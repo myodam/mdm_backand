@@ -3,7 +3,6 @@ package com.ux.mbm.story.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ux.mbm.global.code.ErrorCode;
-import com.ux.mbm.global.code.ReasonCode;
 import com.ux.mbm.story.entity.StoryScene;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -70,14 +69,8 @@ public class SceneMessageResolver {
             }
         }
 
-        // 2. ReasonCode enum fallback (DB에 없을 때 안전망)
         log.warn("[MESSAGE_FALLBACK] fail_messages에 reasonCode 없음 - sceneId={}, reasonCode={}",
                 scene.getSceneId(), reasonCode);
-        try {
-            String enumMsg = ReasonCode.valueOf(reasonCode).getMessage();
-            if (enumMsg != null) return enumMsg;
-        } catch (IllegalArgumentException ignored) {}
-
         return "다시 시도해주세요.";
     }
 
