@@ -24,7 +24,6 @@ public enum ReasonCode {
     HANDS_NOT_TOGETHER,
 
     // ── Scene 3: open_gourd ───────────────────────────────
-    ARMS_NOT_WIDE,
     MOVEMENT_TOO_SMALL,
     HAND_POSITION_TOO_HIGH,
     SAWING_MOTION_TOO_SMALL
