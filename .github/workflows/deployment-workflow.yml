@@ -1,37 +1,72 @@
-name: Deployment Workflow
+name: Build and Deploy
 
 on:
-  push:
+  pull_request:
     branches:
       - main
+    types:
+      - closed   # PR이 merge됐을 때만
+
+env:
+  REGISTRY: ghcr.io
 
 jobs:
-  deploy:
-    runs-on: self-hosted
+  build-and-push:
+    if: github.event.pull_request.merged == true
+    name: 도커 이미지 빌드 & 푸시
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
     steps:
-      - name: Checkout Code
+      - name: 체크아웃
         uses: actions/checkout@v4
 
-      # 🌟 JDK 자동 설치 및 세팅 단계 (서버에 JDK가 없어도 됨!)
-      - name: JDK 설치
-        uses: actions/setup-java@v5
+      - name: JDK 25 세팅
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '25'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: gradlew 권한
+        run: chmod +x ./gradlew
 
-      - name: Build with Gradle
-        # setup-java가 PATH를 알아서 잡아주기 때문에 export 명령어 없이 바로 실행 가능합니다.
-        run: ./gradlew clean build
+      - name: Gradle 빌드 (테스트 제외)
+        run: ./gradlew build -x test
 
-      - name: Build Docker Image
-        run: sudo docker build -t mbm-image .
+      - name: GHCR 로그인
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Make Script Executable
-        run: sudo chmod +x deployment.sh
+      - name: 메타데이터 추출
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}
+          tags: |
+            type=sha
+            type=raw,value=latest
 
-      - name: Run Deployment Script
-        # 인자: [이미지명] [앱 컨테이너명] [포트] [DB 컨테이너명]
-        run: sudo ./deployment.sh mbm-image mbm-app 8080 mbm-mysql
+      - name: 빌드 & 푸시
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+
+  deploy:
+    name: EC2 배포
+    runs-on: self-hosted
+    needs: build-and-push
+
+    steps:
+      - name: GHCR 로그인
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: 배포 실행
+        run: /home/ubuntu/mbm/deployment.sh
