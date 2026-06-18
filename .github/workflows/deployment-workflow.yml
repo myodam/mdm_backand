@@ -9,8 +9,8 @@ jobs:
   deploy:
     runs-on: self-hosted
     env:
+      # JAVA_HOME만 전역으로 설정합니다. PATH 설정은 여기서 하면 에러가 납니다.
       JAVA_HOME: /usr/lib/jvm/java-25-openjdk-amd64
-      PATH: ${{ env.JAVA_HOME }}/bin:${{ env.PATH }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -19,7 +19,10 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew clean build
+        # 빌드 직전에 export 명령어로 PATH를 적용하여 에러를 방지합니다.
+        run: |
+          export PATH=$JAVA_HOME/bin:$PATH
+          ./gradlew clean build
 
       - name: Build Docker Image
         run: sudo docker build -t mbm-image .
@@ -29,4 +32,5 @@ jobs:
 
       - name: Run Deployment Script
         # 인자: [이미지명] [앱 컨테이너명] [포트] [DB 컨테이너명]
+        # 요청하신 MySQL 컨테이너(mbm-mysql) 인자가 정상적으로 포함되어 있습니다.
         run: sudo ./deployment.sh mbm-image mbm-app 8080 mbm-mysql
