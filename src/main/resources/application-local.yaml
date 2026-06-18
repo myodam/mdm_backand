@@ -3,17 +3,17 @@ spring:
     name: mbm
 
   # =====================
-  # MySQL (운영/배포)
+  # MySQL 로컬
   # =====================
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT:3306}/${MYSQL_DATABASE}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: ${MYSQL_USERNAME}
-    password: ${MYSQL_PASSWORD}
+    url: jdbc:mysql://localhost:3306/mbm?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: root
+    password: 1234
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
-      ddl-auto: ${JPA_DDL_AUTO:none}
+      ddl-auto: none
     show-sql: true
     properties:
       hibernate:
@@ -31,7 +31,7 @@ spring:
 
 ai:
   server:
-    url: ${AI_SERVER_URL}
+    url: http://localhost:8000
 
 springdoc:
   swagger-ui:
@@ -43,3 +43,4 @@ logging:
   level:
     com.ux.mbm: DEBUG
     org.hibernate.SQL: DEBUG
+    org.flywaydb: DEBUG
