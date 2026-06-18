@@ -4,13 +4,13 @@ import com.ux.mbm.global.ai.AiServerClient;
 import com.ux.mbm.global.ai.AiServerRequest;
 import com.ux.mbm.global.ai.AiServerResponse;
 import com.ux.mbm.global.code.ErrorCode;
-import com.ux.mbm.global.code.MessageMapper;
 import com.ux.mbm.global.code.ReasonCode;
 import com.ux.mbm.mission.dto.MissionResultRequest;
 import com.ux.mbm.mission.dto.MissionResultResponse;
 import com.ux.mbm.mission.entity.MissionResult;
 import com.ux.mbm.mission.repository.MissionResultRepository;
 import com.ux.mbm.story.entity.StoryScene;
+import com.ux.mbm.story.service.SceneMessageResolver;
 import com.ux.mbm.story.service.StorySceneService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,19 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
-/**
- * 미션 판정 서비스
- *
- * 기획 문서 처리 순서:
- * [1] storyId + sceneId + missionType 유효성 검사 → MISSION_MISMATCH
- * [2] AI 서버 호출 → AI_SERVER_ERROR
- * [3] AI 응답 파싱
- *     - errorCode 있음 → 판정 불가 (USER_NOT_DETECTED, HAND_NOT_VISIBLE 등)
- *     - success=true  → 미션 성공 → nextSceneId/NEXT_SCENE or ENDING
- *     - success=false → 미션 실패 → RETRY
- * [4] DB 저장 (실패 시 SAVE_FAILED 경고, 응답은 정상 반환)
- * [5] Unity에 최종 응답 반환
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -41,46 +28,62 @@ public class MissionResultService {
     private final MissionResultRepository missionResultRepository;
     private final AiServerClient aiServerClient;
     private final StorySceneService storySceneService;
+    private final SceneMessageResolver messageResolver;
 
-    /**
-     * POST /api/missions/check
-     * Unity가 수집한 poseFrames를 받아 AI 판정 후 결과를 반환합니다.
-     *
-     * @Transactional(NOT_SUPPORTED): AI 서버 HTTP 호출이 긴 트랜잭션을 점유하지 않도록
-     * 전체 메서드는 트랜잭션 없이 실행하고 DB 저장만 별도 트랜잭션으로 처리합니다.
-     */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public MissionResultResponse judge(MissionResultRequest request) {
 
-        // ── [1] storyId + sceneId + missionType 유효성 검사 ──────────
+        // ── [1] storyId + sceneId 유효성 검사 ────────────────────────
         Optional<StoryScene> sceneOpt =
                 storySceneService.findScene(request.getStoryId(), request.getSceneId());
 
         if (sceneOpt.isEmpty()) {
-            log.warn("[MISSION_MISMATCH] 지원하지 않는 storyId 또는 sceneId - storyId={}, sceneId={}",
+            log.warn("[MISSION_MISMATCH] 지원하지 않는 storyId/sceneId - storyId={}, sceneId={}",
                     request.getStoryId(), request.getSceneId());
             return buildErrorResponse(request.getSceneId(), ErrorCode.MISSION_MISMATCH);
         }
 
         StoryScene scene = sceneOpt.get();
 
+        // ── [2] beforeMessage=true → AI 호출 없이 before_message 즉시 반환 ──
+        if (request.isBeforeMessage()) {
+            String msg = scene.getBeforeMessage() != null
+                    ? scene.getBeforeMessage()
+                    : "미션을 시작해보세요!";
+
+            log.info("[BEFORE_MESSAGE] sceneId={}, message={}", request.getSceneId(), msg);
+
+            return MissionResultResponse.builder()
+                    .success(false)
+                    .sceneCleared(false)
+                    .currentSceneId(request.getSceneId())
+                    .nextSceneId(null)
+                    .nextAction("READY")          // Unity: 미션 시작 대기 상태
+                    .score(0.0)
+                    .reasonCode(null)
+                    .message(msg)
+                    .errorCode(null)
+                    .warningCode(null)
+                    .build();
+        }
+
+        // ── [3] missionType 검증 (AI 호출 전) ────────────────────────
         if (!scene.getMissionType().equals(request.getMissionType())) {
             log.warn("[MISSION_MISMATCH] missionType 불일치 - sceneId={}, expected={}, actual={}",
                     request.getSceneId(), scene.getMissionType(), request.getMissionType());
             return buildErrorResponse(request.getSceneId(), ErrorCode.MISSION_MISMATCH);
         }
 
-        // ── [2] AI 서버 호출 ─────────────────────────────────────────
-        // POST /internal/ai/missions/check
+        // ── [4] AI 서버 호출 ──────────────────────────────────────────
+        // storyId, sceneId, beforeMessage 제외하고 전달
         AiServerResponse aiResponse = aiServerClient.requestJudge(AiServerRequest.from(request));
 
         if (aiResponse == null) {
-            log.error("[AI_SERVER_ERROR] AI 서버 응답 없음 - sceneId={}, missionType={}",
-                    request.getSceneId(), request.getMissionType());
+            log.error("[AI_SERVER_ERROR] AI 서버 응답 없음 - sceneId={}", request.getSceneId());
             return buildErrorResponse(request.getSceneId(), ErrorCode.AI_SERVER_ERROR);
         }
 
-        // ── [3] AI 응답 파싱 ─────────────────────────────────────────
+        // ── [5] AI 응답 파싱 ──────────────────────────────────────────
         String  aiErrorCode  = aiResponse.getErrorCode();
         String  aiReasonCode = aiResponse.getReasonCode();
         boolean aiSuccess    = aiResponse.isSuccess();
@@ -93,44 +96,35 @@ public class MissionResultService {
         String  nextSceneId;
 
         if (aiErrorCode != null) {
-            // AI 서버가 errorCode 반환 → 판정 불가 (USER_NOT_DETECTED, HAND_NOT_VISIBLE 등)
             success      = false;
             sceneCleared = false;
-            message      = MessageMapper.fromErrorCode(aiErrorCode);
+            message      = messageResolver.resolveErrorMessage(scene, aiErrorCode);
             nextAction   = "RETRY";
             nextSceneId  = null;
             log.info("[AI_ERROR] sceneId={}, errorCode={}", request.getSceneId(), aiErrorCode);
 
         } else if (aiSuccess) {
-            // 미션 성공 — nextSceneId null이면 ENDING, 있으면 NEXT_SCENE
             success      = true;
             sceneCleared = true;
-            message      = MessageMapper.fromReasonCode(
-                    aiReasonCode != null ? aiReasonCode : ReasonCode.MISSION_SUCCESS.name(),
-                    request.getStoryId(), request.getSceneId());
+            message      = messageResolver.resolveSuccessMessage(scene);
             nextSceneId  = scene.getNextSceneId();
             nextAction   = (nextSceneId != null) ? "NEXT_SCENE" : "ENDING";
-            log.info("[MISSION_SUCCESS] sceneId={}, score={}, nextAction={}, nextSceneId={}",
-                    request.getSceneId(), score, nextAction, nextSceneId);
+            log.info("[MISSION_SUCCESS] sceneId={}, score={}, nextAction={}", request.getSceneId(), score, nextAction);
 
         } else {
-            // 미션 실패 (HANDS_TOO_FAR, HAND_NOT_RAISED, ARMS_NOT_WIDE 등)
+            String resolvedReasonCode = aiReasonCode != null ? aiReasonCode : ReasonCode.LOW_SCORE.name();
             success      = false;
             sceneCleared = false;
-            message      = MessageMapper.fromReasonCode(
-                    aiReasonCode, request.getStoryId(), request.getSceneId());
+            message      = messageResolver.resolveFailMessage(scene, resolvedReasonCode);
             nextAction   = "RETRY";
             nextSceneId  = null;
-            log.info("[MISSION_FAIL] sceneId={}, score={}, reasonCode={}",
-                    request.getSceneId(), score, aiReasonCode);
+            log.info("[MISSION_FAIL] sceneId={}, score={}, reasonCode={}", request.getSceneId(), score, aiReasonCode);
         }
 
-        // ── [4] DB 저장 ──────────────────────────────────────────────
-        // 저장 실패 시 SAVE_FAILED 경고, 응답은 정상 반환
-        String warningCode = saveResultSafely(
-                request, success, score, aiReasonCode, aiErrorCode, message);
+        // ── [6] DB 저장 ───────────────────────────────────────────────
+        String warningCode = saveResultSafely(request, success, score, aiReasonCode, aiErrorCode, message);
 
-        // ── [5] Unity에 최종 응답 반환 ───────────────────────────────
+        // ── [7] Unity 최종 응답 ───────────────────────────────────────
         return MissionResultResponse.builder()
                 .success(success)
                 .sceneCleared(sceneCleared)
@@ -145,9 +139,6 @@ public class MissionResultService {
                 .build();
     }
 
-    // ── private 헬퍼 ─────────────────────────────────────────────────
-
-    /** errorCode 기반 실패 응답 생성 */
     private MissionResultResponse buildErrorResponse(String sceneId, ErrorCode errorCode) {
         return MissionResultResponse.builder()
                 .success(false)
@@ -163,12 +154,6 @@ public class MissionResultService {
                 .build();
     }
 
-    /**
-     * DB 저장 (별도 트랜잭션)
-     * AI 판정 성공 후 DB 저장 실패 시 SAVE_FAILED 반환, 사용자 진행은 막지 않습니다.
-     *
-     * @return warningCode ("SAVE_FAILED" 또는 null)
-     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String saveResultSafely(MissionResultRequest request,
                                    boolean success, double score,
@@ -188,11 +173,9 @@ public class MissionResultService {
                             .warningCode(null)
                             .build()
             );
-            log.debug("[SAVE_SUCCESS] storyId={}, sceneId={}", request.getStoryId(), request.getSceneId());
             return null;
-
         } catch (Exception e) {
-            log.error("[SAVE_FAILED] DB 저장 실패 - storyId={}, sceneId={}, error={}",
+            log.error("[SAVE_FAILED] storyId={}, sceneId={}, error={}",
                     request.getStoryId(), request.getSceneId(), e.getMessage());
             return "SAVE_FAILED";
         }

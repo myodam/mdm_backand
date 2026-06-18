@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS story_scenes (
 
 -- 2. 데이터 삽입
 INSERT INTO story_scenes (story_id, scene_id, mission_type, next_scene_id, scene_order) VALUES
-('heungbu_nolbu', 'scene_000', 'skip_book',            'scene_001', 0),
+('heungbu_nolbu', 'scene_000', 'none',            'scene_001', 0),
 ('heungbu_nolbu', 'scene_001', 'protect_swallow', 'scene_002', 1),
 ('heungbu_nolbu', 'scene_002', 'receive_seed',    'scene_003', 2),
 ('heungbu_nolbu', 'scene_003', 'open_gourd',       NULL,       3);

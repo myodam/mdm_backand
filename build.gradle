@@ -47,8 +47,8 @@ dependencies {
     // =====================
     // Flyway (선택 - 쓸 때 주석 해제)
     // =====================
-    // implementation 'org.springframework.boot:spring-boot-starter-flyway'
-    // implementation 'org.flywaydb:flyway-mysql'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    implementation 'org.flywaydb:flyway-mysql'
 
     // =====================
     // Redis (선택 - 쓸 때 주석 해제)
